@@ -1,0 +1,55 @@
+--- a/mercurial/localrepo.py    Thu Feb 01 14:13:41 2018 -0500
++++ b/mercurial/localrepo.py    Tue Mar 19 20:27:01 2018 +0100
+@@ -362,7 +362,26 @@
+         # repository's .hg/store directory.
+         self.svfs = None
+         self.root = self.wvfs.base
+-        self.path = self.wvfs.join(".hg")
++        # check if a new repository is about to be created
++        if create:
++            # check if the environment variable HGDIR is set
++            if "HGDIR" in os.environ:
++                # check if the environment variable HGDIR is not empty
++                if os.environ.get("HGDIR"):
++                    # get the name of the .hg file
++                    filename = self.wvfs.join(".hg")
++                    # check that this path does not already exist
++                    if not os.path.exists(filename):
++                        # create the repository folder if necessary
++                        if not os.path.exists(self.root):
++                            os.makedirs(self.root)
++                        # open the ".hg" file
++                        with open(filename, "w") as f:
++                            # write the environment variable HGDIR to the file
++                            f.write("hgdir: "+os.environ.get("HGDIR"))
++        self.path = vfsmod.vfs(self.retrievehgpath(self.wvfs.join(".hg")),
++                               expandpath=True,
++                               realpath=True).base
+         self.origroot = path
+         # This is only used by context.workingctx.match in order to
+         # detect files in subrepos.
+@@ -510,6 +529,24 @@
+         # Signature to cached matcher instance.
+         self._sparsematchercache = {}
+ 
++    def retrievehgpath(self, path):
++        # set default result
++        result = path
++        # check if the path exists
++        if os.path.exists(result):
++            # check if the path is a regular file
++            if os.path.isfile(result):
++                # open the file...
++                with open(result) as f:
++                    # ... to read the first line
++                    firstline = f.readline().strip()
++                    # check if the line is prefixed with "hgdir:"
++                    if firstline.startswith("hgdir:"):
++                        # return the path without the prefix
++                        result = firstline[len("hgdir:"):].strip()
++        # return the result
++        return result
++
+     def _getvfsward(self, origfunc):
+         """build a ward for self.vfs"""
+         rref = weakref.ref(self)
